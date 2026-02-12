@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 public class Config {
 
     public final ConfigItem<String> remoteConfigUrl = new ConfigItem<>(
-            "remoteConfigUrl", JsonElement::getAsString, JsonPrimitive::new, "https://mc.zbx1425.cn/jlp-srp/client_config.json");
+            "remoteConfigUrl", JsonElement::getAsString, JsonPrimitive::new, "");
 
     public final ConfigItem<List<SourceProperty>> sourceList = new ConfigItem<>(
         "sources",
@@ -81,7 +81,7 @@ public class Config {
             try {
                 HttpRequest httpRequest = HttpRequest.newBuilder(new URI(remoteConfigUrl.value))
                         .timeout(Duration.ofSeconds(10))
-                        .setHeader("User-Agent", "ResourcePackUpdater/" + ResourcePackUpdater.MOD_VERSION + " +https://www.zbx1425.cn")
+                        .setHeader("User-Agent", ResourcePackUpdater.USER_AGENT_NAME + "/" + ResourcePackUpdater.MOD_VERSION)
                         .setHeader("Accept-Encoding", "gzip")
                         .GET()
                         .build();
@@ -134,8 +134,8 @@ public class Config {
     private void addBuiltinSources() {
         /*
         sourceList.value.add(0, new SourceProperty(
-            "MTR Let's Play (HK, Primary)",
-            "https://mc.zbx1425.cn/jlp-srp", true, true, true
+            "Olympia Transit Authority (Primary)",
+            "https://example.com/olympia-srp", true, true, true
         ));
         sourceList.value.add(0, new SourceProperty(
             "MTR Let's Play (CN, Mirror)",

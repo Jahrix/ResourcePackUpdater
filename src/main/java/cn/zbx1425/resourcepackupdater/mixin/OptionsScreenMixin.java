@@ -11,8 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(OptionsScreen.class)
 public class OptionsScreenMixin {
 
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Options;save()V"), method = "updatePackList")
-    void updatePackList(PackRepository packRepository, CallbackInfo ci) {
+    @Inject(at = @At("TAIL"), method = "applyPacks")
+    private void applyPacks(PackRepository packRepository, CallbackInfo ci) {
         ResourcePackUpdater.modifyPackList();
     }
 }

@@ -1,62 +1,69 @@
 package cn.zbx1425.resourcepackupdater.gui.gl;
 
+import cn.zbx1425.resourcepackupdater.ResourcePackUpdater;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-#if MC_VERSION >= "11900"
-public class PreloadTextureResource extends Resource {
-#else
-public class PreloadTextureResource implements Resource {
-#endif
+import java.util.Collections;
+import java.util.Set;
 
-    private final ResourceLocation resourceLocation;
+public class PreloadTextureResource extends Resource {
+
+    private static final PackResources DUMMY_PACK = new PackResources() {
+        @Override
+        public IoSupplier<InputStream> getRootResource(String... pathSegments) {
+            return null;
+        }
+
+        @Override
+        public IoSupplier<InputStream> getResource(PackType type, ResourceLocation resourceLocation) {
+            return null;
+        }
+
+        @Override
+        public void listResources(PackType type, String namespace, String path, ResourceOutput resourceOutput) {
+            // Unused
+        }
+
+        @Override
+        public Set<String> getNamespaces(PackType type) {
+            return Collections.emptySet();
+        }
+
+        @Override
+        public <T> T getMetadataSection(MetadataSectionSerializer<T> metadataSectionSerializer) {
+            return null;
+        }
+
+        @Override
+        public String packId() {
+            return ResourcePackUpdater.MOD_ID + "_preload";
+        }
+
+        @Override
+        public void close() {
+            // No resources to release
+        }
+    };
 
     public PreloadTextureResource(ResourceLocation resourceLocation) {
-#if MC_VERSION >= "11900"
-        super(resourceLocation.toDebugFileName(), InputStream::nullInputStream);
-#endif
-        this.resourceLocation = resourceLocation;
+        super(DUMMY_PACK, () -> openResource(resourceLocation));
     }
 
-#if MC_VERSION >= "11900"
-    @Override
-    public InputStream open() {
-        return getClass().getResourceAsStream("/assets/" + resourceLocation.getNamespace() + "/" + resourceLocation.getPath());
+    private static InputStream openResource(ResourceLocation resourceLocation) throws IOException {
+        InputStream stream = PreloadTextureResource.class.getResourceAsStream(
+                "/assets/" + resourceLocation.getNamespace() + "/" + resourceLocation.getPath()
+        );
+        if (stream == null) {
+            throw new IOException("Missing preload resource: " + resourceLocation);
+        }
+        return stream;
     }
-#else
-    @Override
-    public ResourceLocation getLocation() {
-        return resourceLocation;
-    }
-
-    @Override
-    public InputStream getInputStream() {
-        return getClass().getResourceAsStream("/assets/" + resourceLocation.getNamespace()
-                + "/" + resourceLocation.getPath());
-    }
-
-    @Override
-    public boolean hasMetadata() {
-        return false;
-    }
-
-    @Override
-    public <T> T getMetadata(MetadataSectionSerializer<T> metadataSectionSerializer) {
-        return null;
-    }
-
-    @Override
-    public String getSourceName() {
-        return resourceLocation.toDebugFileName();
-    }
-
-    @Override
-    public void close() throws IOException {
-
-    }
-#endif
 }

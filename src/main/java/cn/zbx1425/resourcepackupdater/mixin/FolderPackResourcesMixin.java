@@ -4,87 +4,129 @@ import cn.zbx1425.resourcepackupdater.ResourcePackUpdater;
 import cn.zbx1425.resourcepackupdater.drm.AssetEncryption;
 import cn.zbx1425.resourcepackupdater.drm.ServerLockRegistry;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.AbstractPackResources;
-import net.minecraft.server.packs.FolderPackResources;
+import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.ResourcePackFileNotFoundException;
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.resources.IoSupplier;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-@Mixin(FolderPackResources.class)
-public abstract class FolderPackResourcesMixin extends AbstractPackResources {
-
-    @Unique
-    private File canonicalFile;
+@Mixin(PathPackResources.class)
+public abstract class FolderPackResourcesMixin {
 
     @Unique
-    private File getCanonicalFile() {
-        if (canonicalFile == null) {
+    private Path canonicalRoot;
+
+    @Unique
+    private Path getCanonicalRoot() {
+        if (canonicalRoot == null) {
             try {
-                canonicalFile = file.getCanonicalFile();
+                canonicalRoot = root.toRealPath();
             } catch (IOException e) {
-                canonicalFile = file;
+                canonicalRoot = root.toAbsolutePath().normalize();
             }
         }
-        return canonicalFile;
+        return canonicalRoot;
     }
 
-    private FolderPackResourcesMixin(File file) { super(file); }
+    @Shadow @Final
+    private Path root;
 
-    @Shadow
-    private File getFile(String string) { return null; }
+    @Unique
+    private boolean isSelectedPackRoot() {
+        File selectedPackRoot = ResourcePackUpdater.CONFIG.packBaseDirFile.value;
+        if (selectedPackRoot == null) {
+            return false;
+        }
+        try {
+            return getCanonicalRoot().equals(selectedPackRoot.getCanonicalFile().toPath());
+        } catch (IOException e) {
+            return getCanonicalRoot().equals(selectedPackRoot.toPath().toAbsolutePath().normalize());
+        }
+    }
+
+    @Unique
+    private static Path resolveInside(Path base, String relative) {
+        Path resolved = base.resolve(relative).normalize();
+        return resolved.startsWith(base) ? resolved : null;
+    }
+
+    @Unique
+    private static IoSupplier<InputStream> encryptedInputSupplier(Path filePath) {
+        return () -> AssetEncryption.wrapInputStream(new FileInputStream(filePath.toFile()));
+    }
+
+    @Inject(method = "getRootResource", at = @At("HEAD"), cancellable = true)
+    private void getRootResource(String[] pathSegments, CallbackInfoReturnable<IoSupplier<InputStream>> cir) {
+        if (isSelectedPackRoot()) {
+            String resourcePath = String.join("/", pathSegments);
+            if (ServerLockRegistry.shouldRefuseProvidingFile(resourcePath)) {
+                cir.setReturnValue(null);
+                cir.cancel();
+                return;
+            }
+            Path resolved = resolveInside(root, resourcePath);
+            if (resolved != null && Files.isRegularFile(resolved)) {
+                cir.setReturnValue(encryptedInputSupplier(resolved));
+                cir.cancel();
+            }
+        }
+    }
 
     @Inject(method = "getResource", at = @At("HEAD"), cancellable = true)
-    void getResource(String resourcePath, CallbackInfoReturnable<InputStream> cir) throws IOException {
-        if (getCanonicalFile().equals(ResourcePackUpdater.CONFIG.packBaseDirFile.value)) {
-            File file = this.getFile(resourcePath);
-            if (file == null || ServerLockRegistry.shouldRefuseProvidingFile(resourcePath)) {
-                throw new ResourcePackFileNotFoundException(this.file, resourcePath);
+    private void getResource(PackType type, ResourceLocation resourceLocation, CallbackInfoReturnable<IoSupplier<InputStream>> cir) {
+        if (isSelectedPackRoot()) {
+            if (ServerLockRegistry.shouldRefuseProvidingFile(resourceLocation.getPath())) {
+                cir.setReturnValue(null);
+                cir.cancel();
+                return;
             }
-            FileInputStream fis = new FileInputStream(file);
-            cir.setReturnValue(AssetEncryption.wrapInputStream(fis));
-            cir.cancel();
+            Path namespaceRoot = root.resolve(type.getDirectory())
+                    .resolve(resourceLocation.getNamespace()).normalize();
+            if (!namespaceRoot.startsWith(root)) {
+                cir.setReturnValue(null);
+                cir.cancel();
+                return;
+            }
+            Path resolved = resolveInside(namespaceRoot, resourceLocation.getPath());
+            if (resolved != null && Files.isRegularFile(resolved)) {
+                cir.setReturnValue(encryptedInputSupplier(resolved));
+                cir.cancel();
+            }
         }
     }
 
-    @Inject(method = "hasResource", at = @At("HEAD"), cancellable = true)
-    void hasResource(String resourcePath, CallbackInfoReturnable<Boolean> cir) {
-        if (getCanonicalFile().equals(ResourcePackUpdater.CONFIG.packBaseDirFile.value)) {
-            if (ServerLockRegistry.shouldRefuseProvidingFile(resourcePath)) {
-                cir.setReturnValue(false); cir.cancel();
-            }
-        }
-    }
-    @Inject(method = "getResources", at = @At("HEAD"), cancellable = true)
-#if MC_VERSION >= "11900"
-    void getResources(PackType type, String namespace, String path, Predicate<ResourceLocation> filter, CallbackInfoReturnable<Collection<ResourceLocation>> cir) {
-#else
-    void getResources(PackType type, String namespace, String path, int maxDepth, Predicate<ResourceLocation> filter, CallbackInfoReturnable<Collection<ResourceLocation>> cir) {
-#endif
-        if (getCanonicalFile().equals(ResourcePackUpdater.CONFIG.packBaseDirFile.value)) {
+    @Inject(method = "listResources", at = @At("HEAD"), cancellable = true)
+    private void listResources(PackType type, String namespace, String path,
+                               PackResources.ResourceOutput resourceOutput, CallbackInfo ci) {
+        if (isSelectedPackRoot()) {
             if (ServerLockRegistry.shouldRefuseProvidingFile(null)) {
-                cir.setReturnValue(Collections.emptyList()); cir.cancel();
+                ci.cancel();
             }
         }
     }
+
     @Inject(method = "getNamespaces", at = @At("HEAD"), cancellable = true)
-    void getNamespaces(PackType type, CallbackInfoReturnable<Set<String>> cir) {
-        if (getCanonicalFile().equals(ResourcePackUpdater.CONFIG.packBaseDirFile.value)) {
+    private void getNamespaces(PackType type, CallbackInfoReturnable<Set<String>> cir) {
+        if (isSelectedPackRoot()) {
             if (ServerLockRegistry.shouldRefuseProvidingFile(null)) {
-                cir.setReturnValue(Collections.emptySet()); cir.cancel();
+                cir.setReturnValue(Collections.emptySet());
+                cir.cancel();
             }
         }
     }

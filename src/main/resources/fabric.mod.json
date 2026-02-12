@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "id": "resourcepackupdater",
   "version": "${version}",
-  "name": "Resource Pack Updating Utility",
-  "description": "Updates a resource pack at game launch, or when requested.",
+  "name": "Olympia Transit Authority Resource Pack Updater",
+  "description": "Olympia Transit Authority's resource pack updater for synchronized server resource packs.",
   "authors": [
-    "Zbx1425"
+    "Olympia Transit Authority"
   ],
-  "contact": {
-    "homepage": "https://www.zbx1425.cn"
-  },
+  "contributors": [
+    "Original ResourcePackUpdater by Zbx1425 (MIT License)"
+  ],
   "license": "MIT",
   "icon": "icon.png",
   "environment": "*",
@@ -22,9 +22,9 @@
     ]
   },
   "depends": {
-    "fabricloader": ">=0.11.7",
+    "fabricloader": ">=0.14.21",
     "fabric": "*",
-    "minecraft": ">=1.17"
+    "minecraft": "1.20.1"
   },
   "mixins": [
     "resourcepackupdater.mixins.json"

@@ -25,8 +25,11 @@ import java.util.concurrent.Executors;
 public class ResourcePackUpdater implements ModInitializer {
 
     public static final String MOD_ID = "resourcepackupdater";
+    public static final String MOD_NAME = "Olympia Transit Authority Resource Pack Updater";
+    public static final String USER_AGENT_NAME = "OlympiaTransitAuthorityResourcePackUpdater";
+    public static final String ORIGINAL_CREDIT = "Based on original ResourcePackUpdater by Zbx1425 (MIT License)";
 
-    public static final Logger LOGGER = LogManager.getLogger("ResourcePackUpdater");
+    public static final Logger LOGGER = LogManager.getLogger("OlympiaTransitAuthorityResourcePackUpdater");
 
     public static String MOD_VERSION = "";
 
@@ -34,8 +37,8 @@ public class ResourcePackUpdater implements ModInitializer {
 
     public static final Config CONFIG = new Config();
 
-    public static final ResourceLocation SERVER_LOCK_PACKET_ID = new ResourceLocation("zbx_rpu", "server_lock");
-    public static final ResourceLocation CLIENT_VERSION_PACKET_ID = new ResourceLocation("zbx_rpu", "client_version");
+    public static final ResourceLocation SERVER_LOCK_PACKET_ID = new ResourceLocation("ota_rpu", "server_lock");
+    public static final ResourceLocation CLIENT_VERSION_PACKET_ID = new ResourceLocation("ota_rpu", "client_version");
 
     public static final JsonParser JSON_PARSER = new JsonParser();
     public static final HttpClient HTTP_CLIENT;

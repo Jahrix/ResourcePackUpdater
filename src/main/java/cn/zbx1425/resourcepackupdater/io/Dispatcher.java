@@ -30,7 +30,8 @@ public class Dispatcher {
                 throw new IOException("There is no source configured. Install the config file to your config folder!");
             }
 
-            cb.printLog("Resource Pack Updater v" + ResourcePackUpdater.MOD_VERSION + " (C) Zbx1425, www.zbx1425.cn");
+            cb.printLog(ResourcePackUpdater.MOD_NAME + " v" + ResourcePackUpdater.MOD_VERSION);
+            cb.printLog(ResourcePackUpdater.ORIGINAL_CREDIT);
             cb.printLog("Server: " + source.baseUrl);
             cb.printLog("Target: " + baseDir);
             cb.printLog("");
