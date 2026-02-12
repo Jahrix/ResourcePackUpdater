@@ -3,6 +3,7 @@ package cn.zbx1425.resourcepackupdater;
 import cn.zbx1425.resourcepackupdater.drm.ServerLockRegistry;
 import cn.zbx1425.resourcepackupdater.gui.gl.GlHelper;
 import cn.zbx1425.resourcepackupdater.gui.GlProgressScreen;
+import cn.zbx1425.resourcepackupdater.gui.gl.PreloadTextureResource;
 import cn.zbx1425.resourcepackupdater.io.Dispatcher;
 import cn.zbx1425.resourcepackupdater.io.network.DummyTrustManager;
 import com.google.gson.JsonParser;
@@ -14,6 +15,7 @@ import net.minecraft.client.Options;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.resources.Resource;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -211,5 +213,9 @@ public class ResourcePackUpdater implements ModInitializer {
         PackRepository repository = Minecraft.getInstance().getResourcePackRepository();
         repository.reload();
         options.loadSelectedResourcePacks(repository);
+    }
+
+    public static Resource createPreloadTextureResource(ResourceLocation resourceLocation) {
+        return new PreloadTextureResource(resourceLocation);
     }
 }

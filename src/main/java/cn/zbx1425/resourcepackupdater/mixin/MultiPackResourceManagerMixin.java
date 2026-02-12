@@ -1,7 +1,6 @@
 package cn.zbx1425.resourcepackupdater.mixin;
 
 import cn.zbx1425.resourcepackupdater.ResourcePackUpdater;
-import cn.zbx1425.resourcepackupdater.gui.gl.PreloadTextureResource;
 import net.minecraft.resources.ResourceLocation;
 #if MC_VERSION >= "11800"
 import net.minecraft.server.packs.resources.MultiPackResourceManager;
@@ -31,9 +30,9 @@ public class MultiPackResourceManagerMixin {
 #endif
         if (resourceLocation.getNamespace().equals(ResourcePackUpdater.MOD_ID)) {
 #if MC_VERSION >= "11900"
-            cir.setReturnValue(Optional.of(new PreloadTextureResource(resourceLocation)));
+            cir.setReturnValue(Optional.of(ResourcePackUpdater.createPreloadTextureResource(resourceLocation)));
 #else
-            cir.setReturnValue(new PreloadTextureResource(resourceLocation));
+            cir.setReturnValue(ResourcePackUpdater.createPreloadTextureResource(resourceLocation));
 #endif
             cir.cancel();
         }
