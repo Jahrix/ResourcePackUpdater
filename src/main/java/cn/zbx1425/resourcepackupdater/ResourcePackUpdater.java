@@ -72,6 +72,9 @@ public class ResourcePackUpdater implements ModInitializer {
 
     public static void dispatchSyncWork() {
         if (!shouldSyncForCurrentServer()) {
+            // When sync is intentionally skipped, treat it as a non-error state.
+            // This prevents the "Synced Resource Pack Incomplete" lock/toast path.
+            ServerLockRegistry.lockAllSyncedPacks = false;
             ResourcePackUpdater.LOGGER.info("Skipping resource pack sync due to onlyForServers filter.");
             return;
         }
