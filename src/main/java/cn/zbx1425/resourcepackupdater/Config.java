@@ -51,6 +51,24 @@ public class Config {
         "disableBuiltinSources", JsonElement::getAsBoolean, JsonPrimitive::new, false);
     public final ConfigItem<Boolean> pauseWhenSuccess = new ConfigItem<>(
         "pauseWhenSuccess", JsonElement::getAsBoolean, JsonPrimitive::new, false);
+    public final ConfigItem<List<String>> onlyForServers = new ConfigItem<>(
+        "onlyForServers",
+        (json) -> {
+            List<String> list = new ArrayList<>();
+            for (JsonElement value : json.getAsJsonArray()) {
+                list.add(value.getAsString());
+            }
+            return list;
+        },
+        (value) -> {
+            JsonArray array = new JsonArray();
+            for (String entry : value) {
+                array.add(entry);
+            }
+            return array;
+        },
+        new ArrayList<>()
+    );
     public final ConfigItem<File> packBaseDirFile = new ConfigItem<File>(
         "packBaseDirFile", (json) -> new File(json.getAsString()),
             (value) -> new JsonPrimitive(value.toString()), () -> new File(getPackBaseDir()));
@@ -64,7 +82,7 @@ public class Config {
 
     public List<ConfigItem<?>> configItems = List.of(
         remoteConfigUrl, sourceList, selectedSource, localPackName, disableBuiltinSources,
-        pauseWhenSuccess, packBaseDirFile, serverLockKey, clientEnforceInstall, clientEnforceVersion
+        pauseWhenSuccess, onlyForServers, packBaseDirFile, serverLockKey, clientEnforceInstall, clientEnforceVersion
     );
 
     public void load() throws IOException {
@@ -73,6 +91,7 @@ public class Config {
         }
 
         JsonObject localConfig = (JsonObject)ResourcePackUpdater.JSON_PARSER.parse(Files.readString(getConfigFilePath()));
+        boolean migratedLegacyManifestConfig = migrateLegacyManifestConfig(localConfig);
         remoteConfigUrl.load(localConfig, new JsonObject());
         JsonObject remoteConfig;
         if (remoteConfigUrl.value.isEmpty()) {
@@ -119,6 +138,9 @@ public class Config {
                     false, false, true
             );
         }
+        if (migratedLegacyManifestConfig) {
+            save();
+        }
     }
 
     public void save() throws IOException {
@@ -142,6 +164,32 @@ public class Config {
             "https://seu.complexstudio.net/jlp-srp", true, false, true
         ));
         */
+    }
+
+    private boolean migrateLegacyManifestConfig(JsonObject localConfig) {
+        if (!localConfig.has("manifestUrl") || localConfig.has("sources")) {
+            return false;
+        }
+        String manifestUrl = localConfig.get("manifestUrl").getAsString();
+        boolean enabled = !localConfig.has("enabled") || localConfig.get("enabled").getAsBoolean();
+
+        JsonArray sources = new JsonArray();
+        if (enabled && !manifestUrl.isBlank()) {
+            JsonObject source = new JsonObject();
+            source.addProperty("name", "Olympia Primary");
+            source.addProperty("baseUrl", manifestUrl);
+            source.addProperty("hasDirHash", false);
+            source.addProperty("hasArchive", true);
+            sources.add(source);
+            localConfig.add("selectedSource", source.deepCopy());
+        }
+
+        localConfig.add("sources", sources);
+        localConfig.addProperty("disableBuiltinSources", true);
+        if (!localConfig.has("remoteConfigUrl")) {
+            localConfig.addProperty("remoteConfigUrl", "");
+        }
+        return true;
     }
 
     public String getPackBaseDir() {

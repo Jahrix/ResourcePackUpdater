@@ -10,6 +10,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.repository.PackRepository;
 import org.apache.logging.log4j.LogManager;
@@ -18,6 +19,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,6 +71,11 @@ public class ResourcePackUpdater implements ModInitializer {
     }
 
     public static void dispatchSyncWork() {
+        if (!shouldSyncForCurrentServer()) {
+            ResourcePackUpdater.LOGGER.info("Skipping resource pack sync due to onlyForServers filter.");
+            return;
+        }
+
         GlHelper.initGlStates();
 
         while (true) {
@@ -137,6 +144,36 @@ public class ResourcePackUpdater implements ModInitializer {
 
         ServerLockRegistry.updateLocalServerLock(ResourcePackUpdater.CONFIG.packBaseDirFile.value);
         GlHelper.resetGlStates();
+    }
+
+    private static boolean shouldSyncForCurrentServer() {
+        if (ResourcePackUpdater.CONFIG.onlyForServers.value == null || ResourcePackUpdater.CONFIG.onlyForServers.value.isEmpty()) {
+            return true;
+        }
+        ServerData currentServer = Minecraft.getInstance().getCurrentServer();
+        if (currentServer == null || currentServer.ip == null || currentServer.ip.isBlank()) {
+            return false;
+        }
+        String currentHost = normalizeServerHost(currentServer.ip);
+        for (String allowedServer : ResourcePackUpdater.CONFIG.onlyForServers.value) {
+            if (currentHost.equals(normalizeServerHost(allowedServer))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeServerHost(String rawServerAddress) {
+        String host = rawServerAddress.trim().toLowerCase(Locale.ROOT);
+        if (host.startsWith("[")) {
+            int endIndex = host.indexOf(']');
+            return endIndex > 0 ? host.substring(0, endIndex + 1) : host;
+        }
+        int colonIndex = host.lastIndexOf(':');
+        if (colonIndex > 0 && host.indexOf(':') == colonIndex) {
+            return host.substring(0, colonIndex);
+        }
+        return host;
     }
 
     public static void modifyPackList() {
