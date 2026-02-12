@@ -21,6 +21,8 @@ import java.util.function.Supplier;
 
 public class Config {
 
+    private static final String DEFAULT_OLYMPIA_MANIFEST_URL = "https://letsplay.jahrix.xyz/api/resourcepack/latest";
+
     public final ConfigItem<String> remoteConfigUrl = new ConfigItem<>(
             "remoteConfigUrl", JsonElement::getAsString, JsonPrimitive::new, "");
 
@@ -92,6 +94,7 @@ public class Config {
 
         JsonObject localConfig = (JsonObject)ResourcePackUpdater.JSON_PARSER.parse(Files.readString(getConfigFilePath()));
         boolean migratedLegacyManifestConfig = migrateLegacyManifestConfig(localConfig);
+        boolean seededDefaultSourceConfig = seedDefaultSourceConfig(localConfig);
         remoteConfigUrl.load(localConfig, new JsonObject());
         JsonObject remoteConfig;
         if (remoteConfigUrl.value.isEmpty()) {
@@ -138,7 +141,7 @@ public class Config {
                     false, false, true
             );
         }
-        if (migratedLegacyManifestConfig) {
+        if (migratedLegacyManifestConfig || seededDefaultSourceConfig) {
             save();
         }
     }
@@ -190,6 +193,59 @@ public class Config {
             localConfig.addProperty("remoteConfigUrl", "");
         }
         return true;
+    }
+
+    private boolean seedDefaultSourceConfig(JsonObject localConfig) {
+        if (hasConfiguredSource(localConfig)) {
+            return false;
+        }
+
+        JsonObject source = new JsonObject();
+        source.addProperty("name", "Olympia Primary");
+        source.addProperty("baseUrl", DEFAULT_OLYMPIA_MANIFEST_URL);
+        source.addProperty("hasDirHash", false);
+        source.addProperty("hasArchive", true);
+
+        JsonArray sources = new JsonArray();
+        sources.add(source);
+
+        localConfig.add("sources", sources);
+        localConfig.add("selectedSource", source.deepCopy());
+        if (!localConfig.has("disableBuiltinSources")) {
+            localConfig.addProperty("disableBuiltinSources", true);
+        }
+        if (!localConfig.has("remoteConfigUrl")) {
+            localConfig.addProperty("remoteConfigUrl", "");
+        }
+        if (!localConfig.has("onlyForServers")) {
+            JsonArray onlyForServers = new JsonArray();
+            onlyForServers.add("olympia.mintservers.com");
+            onlyForServers.add("standard.us.28.mintservers.com");
+            localConfig.add("onlyForServers", onlyForServers);
+        }
+        ResourcePackUpdater.LOGGER.info("Seeded default Olympia resource pack source into empty config.");
+        return true;
+    }
+
+    private boolean hasConfiguredSource(JsonObject localConfig) {
+        if (localConfig.has("sources") && localConfig.get("sources").isJsonArray()) {
+            JsonArray sources = localConfig.getAsJsonArray("sources");
+            for (JsonElement element : sources) {
+                if (!element.isJsonObject()) continue;
+                JsonObject sourceObj = element.getAsJsonObject();
+                if (sourceObj.has("baseUrl") && !sourceObj.get("baseUrl").getAsString().isBlank()) {
+                    return true;
+                }
+            }
+        }
+
+        if (localConfig.has("selectedSource") && localConfig.get("selectedSource").isJsonObject()) {
+            JsonObject selected = localConfig.getAsJsonObject("selectedSource");
+            if (selected.has("baseUrl") && !selected.get("baseUrl").getAsString().isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String getPackBaseDir() {
