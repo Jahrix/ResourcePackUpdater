@@ -7,6 +7,7 @@ import cn.zbx1425.resourcepackupdater.io.Dispatcher;
 import cn.zbx1425.resourcepackupdater.io.network.DummyTrustManager;
 import com.google.gson.JsonParser;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -68,6 +69,15 @@ public class ResourcePackUpdater implements ModInitializer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> client.execute(() -> {
+            if (!shouldSyncForCurrentServer()) {
+                ServerLockRegistry.lockAllSyncedPacks = false;
+                ResourcePackUpdater.LOGGER.info("Skipping join-triggered resource pack sync due to onlyForServers filter.");
+                return;
+            }
+            ResourcePackUpdater.LOGGER.info("Triggering resource pack sync after server join.");
+            client.reloadResourcePacks();
+        }));
     }
 
     public static void dispatchSyncWork() {
@@ -133,8 +143,9 @@ public class ResourcePackUpdater implements ModInitializer {
                 if (ResourcePackUpdater.CONFIG.sourceList.value.size() <= 1) {
                     break;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 ServerLockRegistry.lockAllSyncedPacks = true;
+                ResourcePackUpdater.LOGGER.error("Resource pack sync failed with exception.", e);
                 break;
             }
         }
